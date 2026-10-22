@@ -451,6 +451,7 @@ MENU.forEach(m=>{
 const UNIT = Object.fromEntries(UNITS.map(u=>[u.key,u]));
 
 const won = n => n.toLocaleString("ko-KR")+"원";
+window.__kioskIdle = () => { try{ return cartQty()===0 && $("confirm").hidden && $("report").hidden && $("ask").hidden; }catch(e){ return true; } };
 const $ = id => document.getElementById(id);
 
 let state = {orders:[], seq:0};
@@ -789,7 +790,16 @@ if(document.fonts&&document.fonts.ready) document.fonts.ready.then(syncRail);
 /* offline cache + keep stored orders from being evicted */
 (function(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){
-    window.addEventListener('load',function(){navigator.serviceWorker.register('./sw.js').catch(function(){});});
+    var hadController=!!navigator.serviceWorker.controller, reloaded=false;
+    window.addEventListener('load',function(){
+      navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(function(r){ try{r.update();}catch(e){} }).catch(function(){});
+    });
+    // a newer version took over: refresh right away if nobody is in the middle of an order
+    navigator.serviceWorker.addEventListener('controllerchange',function(){
+      if(!hadController||reloaded) return;
+      var idle=true; try{ idle=window.__kioskIdle?window.__kioskIdle():true; }catch(e){}
+      if(idle){ reloaded=true; location.reload(); }
+    });
   }
   try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(); }catch(e){}
   document.addEventListener('gesturestart',function(e){e.preventDefault();});
